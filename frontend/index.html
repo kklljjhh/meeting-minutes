@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>会议纪要系统</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    .header { text-align: center; color: white; margin-bottom: 24px; }
+    .header h1 { font-size: 2.2rem; margin-bottom: 8px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+    .header p { font-size: 1rem; opacity: 0.9; }
+
+    /* ── 步骤进度条 ── */
+    .steps-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255,255,255,0.18);
+      border-radius: 50px;
+      padding: 12px 24px;
+      margin-bottom: 28px;
+      gap: 0;
+    }
+    .step-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: rgba(255,255,255,0.6);
+      font-size: 0.88rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .step-item.active { color: white; }
+    .step-item.done { color: rgba(255,255,255,0.85); }
+    .step-circle {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.4);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.78rem; font-weight: bold;
+      background: transparent;
+      flex-shrink: 0;
+    }
+    .step-item.active .step-circle {
+      background: white;
+      color: #667eea;
+      border-color: white;
+    }
+    .step-item.done .step-circle {
+      background: rgba(255,255,255,0.3);
+      border-color: rgba(255,255,255,0.6);
+      color: white;
+    }
+    .step-connector {
+      width: 40px; height: 2px;
+      background: rgba(255,255,255,0.3);
+      flex-shrink: 0;
+    }
+    .step-connector.done { background: rgba(255,255,255,0.7); }
+
+    /* ── 卡片 ── */
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 28px 32px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 1.1rem; font-weight: bold; color: #333;
+      margin-bottom: 18px; padding-bottom: 12px;
+      border-bottom: 2px solid #eee; position: relative;
+    }
+    .card-title::after {
+      content: ''; position: absolute; bottom: -2px; left: 0;
+      width: 60px; height: 2px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    /* ── 表单 ── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 22px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full-width { grid-column: 1 / -1; }
+    .form-group label { font-size: 0.85rem; color: #555; font-weight: 500; }
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      padding: 8px 11px;
+      border: 1.5px solid #ddd; border-radius: 8px;
+      font-size: 0.93rem; font-family: inherit; color: #333;
+      transition: border-color 0.25s; background: #fafafa;
+    }
+    .form-group input:focus,
+    .form-group textarea:focus { outline: none; border-color: #667eea; background: #fff; }
+
+    /* ── 上传区域 ── */
+    .upload-area {
+      border: 3px dashed #ddd; border-radius: 12px;
+      padding: 40px 20px; text-align: center; cursor: pointer;
+      transition: all 0.3s ease; background: #fafafa;
+    }
+    .upload-area:hover, .upload-area.dragover { border-color: #667eea; background: #f0f4ff; }
+    .upload-area .upload-icon { font-size: 3rem; margin-bottom: 12px; display: block; }
+    .upload-area h3 { color: #333; margin-bottom: 6px; }
+    .upload-area p { color: #888; font-size: 0.88rem; }
+    #audioFile { display: none; }
+    .file-info {
+      margin-top: 12px; padding: 10px 14px;
+      background: #e8f5e9; border-radius: 8px;
+      color: #2e7d32; font-size: 0.9rem; display: none;
+    }
+    .file-info.show { display: block; }
+
+    /* ── 按钮 ── */
+    .btn {
+      display: inline-block; padding: 10px 26px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white; border: none; border-radius: 8px;
+      font-size: 0.95rem; cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-top: 16px;
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(102,126,234,0.4); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .btn-secondary {
+      background: #f5f5f5; color: #555; border: 1.5px solid #ddd;
+      padding: 10px 24px; border-radius: 8px; font-size: 0.95rem;
+      cursor: pointer; transition: all 0.2s; margin-top: 16px;
+    }
+    .btn-secondary:hover { background: #ebebeb; }
+    .btn-green {
+      background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+    }
+    .btn-green:hover { box-shadow: 0 5px 20px rgba(76,175,80,0.4); }
+    .btn-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+    /* ── loading ── */
+    .loading { text-align: center; padding: 36px; }
+    .loading-spinner {
+      width: 40px; height: 40px;
+      border: 4px solid #f0f0f0; border-top: 4px solid #667eea;
+      border-radius: 50%; animation: spin 1s linear infinite;
+      margin: 0 auto 14px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* ── textarea 只读转写文本 ── */
+    .transcript-box {
+      width: 100%; height: 200px; padding: 12px 14px;
+      border: 1.5px solid #ddd; border-radius: 10px;
+      resize: vertical; font-size: 0.9rem; line-height: 1.75;
+      font-family: inherit; color: #333; background: #f8f9ff;
+    }
+    .transcript-box:focus { outline: none; border-color: #667eea; }
+
+    /* ── 步骤2 左右分栏 ── */
+    .step2-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .step2-left { min-width: 0; }
+    .step2-right { min-width: 0; overflow-y: auto; }
+    .step2-left .transcript-box { height: calc(100% - 36px); min-height: 400px; }
+
+    /* ── 说话人任务分配 ── */
+    .speaker-assign-title {
+      font-size: 0.95rem; font-weight: bold; color: #e65100;
+      margin: 18px 0 10px; padding-bottom: 8px;
+      border-bottom: 2px solid #ffe0b2;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .speaker-assign-title::before { content: '🎯'; }
+    .attendee-tag {
+      display: inline-block; padding: 4px 12px;
+      background: #e3f0ff; color: #1565c0;
+      border: 1px solid #90caf9; border-radius: 16px;
+      font-size: 0.85rem; cursor: grab; user-select: none;
+      transition: background 0.15s;
+    }
+    .attendee-tag:active { cursor: grabbing; background: #bbdefb; }
+    .speaker-row {
+      display: grid; grid-template-columns: 80px 1fr;
+      gap: 8px; align-items: center; margin-bottom: 8px;
+    }
+    .speaker-label {
+      font-size: 0.82rem; font-weight: bold; color: #fff;
+      background: linear-gradient(135deg, #ff9800, #f44336);
+      padding: 4px 8px; border-radius: 6px; text-align: center;
+    }
+    .speaker-row input {
+      padding: 6px 9px; border: 1.5px solid #ffe0b2; border-radius: 7px;
+      font-size: 0.85rem; font-family: inherit; background: #fff8f0;
+      color: #333; transition: border-color 0.2s;
+    }
+    .speaker-row input:focus { outline: none; border-color: #ff9800; background: #fff; }
+    .speaker-map-box {
+      margin-top: 10px; padding: 10px 12px;
+      background: #fff3e0; border-radius: 8px; border: 1.5px solid #ffe0b2;
+    }
+    .speaker-map-box label { font-size: 0.82rem; color: #e65100; font-weight: bold; }
+    .speaker-map-box input {
+      margin-top: 5px; width: 100%; padding: 7px 10px;
+      border: 1.5px solid #ffcc80; border-radius: 7px;
+      font-size: 0.87rem; font-family: inherit; background: #fff;
+      color: #333;
+    }
+    .speaker-map-box input:focus { outline: none; border-color: #ff9800; }
+
+    /* ── 步骤3 确认界面 ── */
+    .confirm-section { margin-bottom: 28px; }
+    .confirm-section-title {
+      font-size: 1.05rem; font-weight: bold; color: #333;
+      margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+    }
+    .editable-textarea {
+      width: 100%; padding: 10px 12px;
+      border: 1.5px solid #ddd; border-radius: 8px;
+      font-size: 0.9rem; line-height: 1.75; font-family: inherit;
+      color: #333; background: #fafafa; resize: vertical;
+      transition: border-color 0.2s;
+    }
+    .editable-textarea:focus { outline: none; border-color: #667eea; background: #fff; }
+    .list-edit-item {
+      display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px;
+    }
+    .list-edit-item input {
+      flex: 1; padding: 7px 10px;
+      border: 1.5px solid #ddd; border-radius: 7px;
+      font-size: 0.88rem; font-family: inherit; color: #333; background: #fafafa;
+      transition: border-color 0.2s;
+    }
+    .list-edit-item input:focus { outline: none; border-color: #667eea; background: #fff; }
+    .point-textarea {
+      flex: 1; padding: 7px 10px;
+      border: 1.5px solid #ddd; border-radius: 7px;
+      font-size: 0.88rem; font-family: inherit; color: #333; background: #fafafa;
+      transition: border-color 0.2s; resize: none; overflow: hidden;
+      min-height: 34px; line-height: 1.5;
+    }
+    .point-textarea:focus { outline: none; border-color: #667eea; background: #fff; }
+    .btn-remove-item {
+      background: none; border: none; color: #ccc; font-size: 1.1rem;
+      cursor: pointer; padding: 4px; line-height: 1; margin-top: 4px;
+      transition: color 0.2s;
+    }
+    .btn-remove-item:hover { color: #f44336; }
+
+    /* 会议记录分块 */
+    .record-block-edit {
+      background: #f8f9ff; border-radius: 10px; padding: 14px 16px;
+      margin-bottom: 12px; border-left: 4px solid #667eea;
+    }
+    .record-block-edit input {
+      width: 100%; padding: 6px 9px; margin-bottom: 8px;
+      border: 1.5px solid #ddd; border-radius: 7px;
+      font-size: 0.92rem; font-family: inherit; font-weight: bold;
+      color: #333; background: #fff; transition: border-color 0.2s;
+    }
+    .record-block-edit input:focus { outline: none; border-color: #667eea; }
+    .record-block-edit textarea {
+      width: 100%; padding: 8px 10px;
+      border: 1.5px solid #ddd; border-radius: 7px;
+      font-size: 0.88rem; line-height: 1.75; font-family: inherit;
+      color: #333; background: #fff; resize: vertical;
+      transition: border-color 0.2s;
+    }
+    .record-block-edit textarea:focus { outline: none; border-color: #667eea; }
+
+    /* 说话人观点编辑 */
+    .speaker-view-edit {
+      background: #fff8f0; border-radius: 10px; padding: 14px 16px;
+      margin-bottom: 12px; border-left: 4px solid #ff9800;
+    }
+    .speaker-view-edit .speaker-name-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 3px 12px;
+      background: linear-gradient(135deg, #ff9800, #f44336);
+      color: white; border-radius: 12px; font-size: 0.8rem; font-weight: bold;
+      margin-bottom: 8px;
+    }
+    .speaker-view-edit .list-edit-item input { background: #fff; }
+
+    /* 后续行动项表格 */
+    .action-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .action-table th {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white; padding: 8px 10px; text-align: left; font-weight: 500;
+    }
+    .action-table th:first-child { border-radius: 8px 0 0 0; }
+    .action-table th:last-child { border-radius: 0 8px 0 0; }
+    .action-table td { padding: 6px 8px; border-bottom: 1px solid #eee; }
+    .action-table tr:hover td { background: #fafafa; }
+    .action-table input {
+      width: 100%; padding: 5px 8px; border: 1.5px solid #eee;
+      border-radius: 6px; font-size: 0.85rem; font-family: inherit;
+      background: transparent; color: #333; transition: border-color 0.2s;
+    }
+    .action-table input:focus { outline: none; border-color: #667eea; background: #fff; }
+    .action-table .seq-num {
+      width: 36px; text-align: center; color: #999; font-size: 0.8rem;
+    }
+
+    /* ── 步骤4 生成成功 ── */
+    .success-box {
+      text-align: center; padding: 40px 20px;
+    }
+    .success-icon { font-size: 4rem; margin-bottom: 16px; }
+    .success-box h2 { color: #333; margin-bottom: 8px; }
+    .success-box p { color: #666; margin-bottom: 24px; }
+
+    /* ── 分节线 ── */
+    .divider { border: none; border-top: 2px dashed #eee; margin: 20px 0; }
+
+    /* ── 响应式 ── */
+    @media (max-width: 700px) {
+      .card { padding: 18px 16px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .form-group.full-width { grid-column: 1; }
+      .header h1 { font-size: 1.7rem; }
+      .step2-layout { grid-template-columns: 1fr; }
+      .speaker-row { grid-template-columns: 70px 1fr; }
+      .steps-bar { gap: 0; padding: 10px 12px; }
+      .step-connector { width: 20px; }
+      .step-item { font-size: 0.75rem; }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>&#x1F3A4; &#x4F1A;&#x8BAE;&#x7EAA;&#x8981;&#x7CFB;&#x7EDF;</h1>
+      <p>&#x56DB;&#x6B65;&#x5B8C;&#x6210;&#xFF1A;&#x4E0A;&#x4F20;&#x5F55;&#x97F3; &#x2192; &#x586B;&#x5199;&#x4FE1;&#x606F; &#x2192; &#x786E;&#x8BA4;&#x5185;&#x5BB9; &#x2192; &#x751F;&#x6210;&#x6587;&#x6863;</p>
+    </div>
+    <div class="steps-bar" id="stepsBar">
+      <div class="step-item active" id="stepItem1"><div class="step-circle">1</div><span>&#x4E0A;&#x4F20;&#x5F55;&#x97F3;</span></div>
+      <div class="step-connector" id="conn1"></div>
+      <div class="step-item" id="stepItem2"><div class="step-circle">2</div><span>&#x586B;&#x5199;&#x4FE1;&#x606F;</span></div>
+      <div class="step-connector" id="conn2"></div>
+      <div class="step-item" id="stepItem3"><div class="step-circle">3</div><span>&#x786E;&#x8BA4;&#x5185;&#x5BB9;</span></div>
+      <div class="step-connector" id="conn3"></div>
+      <div class="step-item" id="stepItem4"><div class="step-circle">4</div><span>&#x751F;&#x6210;&#x6587;&#x6863;</span></div>
+    </div>
+    <div id="step1">
+      <div class="card">
+        <div class="card-title">&#x1F4C1; &#x4E0A;&#x4F20;&#x5F55;&#x97F3;&#x6587;&#x4EF6;</div>
+        <div class="upload-area" id="uploadArea">
+          <span class="upload-icon">&#x1F3A4;</span>
+          <h3>&#x70B9;&#x51FB;&#x6216;&#x62D6;&#x62FD;&#x4E0A;&#x4F20;&#x5F55;&#x97F3;&#x6587;&#x4EF6;</h3>
+          <p>&#x652F;&#x6301; MP3&#x3001;M4A&#x3001;WAV&#x3001;OGG &#x7B49;&#x97F3;&#x9891;&#x683C;&#x5F0F;</p>
+          <input type="file" id="audioFile" accept="audio/*">
+        </div>
+        <div class="file-info" id="fileInfo"><span id="fileName"></span></div>
+        <div class="btn-row"><button class="btn" id="transcribeBtn">&#x1F680; &#x5F00;&#x59CB;&#x8F6C;&#x5199;</button></div>
+      </div>
+      <div class="card">
+        <div class="card-title">&#x270F; &#x6216;&#x76F4;&#x63A5;&#x7C98;&#x8D34;/&#x8F93;&#x5165;&#x8F6C;&#x5199;&#x6587;&#x672C;</div>
+        <textarea class="transcript-box" id="manualText" placeholder="&#x5982;&#x5DF2;&#x6709;&#x8F6C;&#x5199;&#x6587;&#x672C;&#xFF0C;&#x53EF;&#x76F4;&#x63A5;&#x7C98;&#x8D34;..."></textarea>
+        <div class="btn-row"><button class="btn" id="useManualBtn">&#x2705; &#x4F7F;&#x7528;&#x6B64;&#x6587;&#x672C;&#xFF0C;&#x4E0B;&#x4E00;&#x6B65;</button></div>
+      </div>
+      <div class="loading" id="loadingStep1" style="display:none;">
+        <div class="loading-spinner"></div>
+        <p>&#x6B63;&#x5728;&#x8F6C;&#x5199;&#xFF0C;&#x8BF7;&#x7A0D;&#x5019;&#xFF08;&#x7EA6;&#x9700;1-3&#x5206;&#x949F;&#xFF09;...</p>
+      </div>
+      <div class="card" id="transcriptResult" style="display:none;">
+        <div class="card-title">&#x1F4C4; &#x8F6C;&#x5199;&#x7ED3;&#x679C;</div>
+        <textarea class="transcript-box" id="transcriptBox" readonly style="height:260px;"></textarea>
+        <div class="btn-row"><button class="btn" id="toStep2Btn">&#x4E0B;&#x4E00;&#x6B65;&#xFF1A;&#x586B;&#x5199;&#x4F1A;&#x8BAE;&#x4FE1;&#x606F; &#x2192;</button></div>
+      </div>
+    </div>
+    <div id="step2" style="display:none;">
+      <div class="step2-layout">
+        <div class="step2-left">
+          <div class="card" style="height:100%;">
+            <div class="card-title">&#x1F4C4; &#x8F6C;&#x5199;&#x6587;&#x672C;&#xFF08;&#x5BF9;&#x7167;&#x53C2;&#x8003;&#xFF09;</div>
+            <textarea class="transcript-box" id="transcriptRef" readonly></textarea>
+          </div>
+        </div>
+        <div class="step2-right">
+          <div class="card">
+            <div class="card-title">&#x1F4CB; &#x57FA;&#x672C;&#x4FE1;&#x606F;</div>
+            <div class="form-grid">
+              <div class="form-group full-width"><label for="meetingName">&#x4F1A;&#x8BAE;&#x540D;&#x79F0;</label><input type="text" id="meetingName" placeholder="&#x8BF7;&#x8F93;&#x5165;&#x4F1A;&#x8BAE;&#x540D;&#x79F0;"></div>
+              <div class="form-group"><label for="convener">&#x53EC;&#x96C6;&#x4EBA;&#x5458;</label><input type="text" id="convener" placeholder="&#x8BF7;&#x8F93;&#x5165;&#x53EC;&#x96C6;&#x4EBA;&#x5458;"></div>
+              <div class="form-group"><label for="meetingDate">&#x4F1A;&#x8BAE;&#x65E5;&#x671F;</label><input type="date" id="meetingDate"></div>
+              <div class="form-group"><label for="startTime">&#x5F00;&#x59CB;&#x65F6;&#x95F4;</label><input type="time" id="startTime"></div>
+              <div class="form-group"><label for="duration">&#x6301;&#x7EED;&#x65F6;&#x95F4;</label><input type="text" id="duration" placeholder="&#x5982;&#xFF1A;1&#x5C0F;&#x65F6;"></div>
+              <div class="form-group"><label for="location">&#x4F1A;&#x8BAE;&#x5730;&#x70B9;</label><input type="text" id="location" placeholder="&#x8BF7;&#x8F93;&#x5165;&#x4F1A;&#x8BAE;&#x5730;&#x70B9;"></div>
+              <div class="form-group"><label for="recorder">&#x8BB0;&#x5F55;&#x4EBA;&#x5458;</label><input type="text" id="recorder" placeholder="&#x8BF7;&#x8F93;&#x5165;&#x8BB0;&#x5F55;&#x4EBA;&#x5458;"></div>
+              <div class="form-group"><label for="reviewer">&#x5BA1;&#x6838;&#x4EBA;&#x5458;</label><input type="text" id="reviewer" placeholder="&#x8BF7;&#x8F93;&#x5165;&#x5BA1;&#x6838;&#x4EBA;&#x5458;"></div>
+              <div class="form-group full-width"><label for="attendees">&#x53C2;&#x52A0;&#x4EBA;&#x5458;</label><input type="text" id="attendees" placeholder="&#x591A;&#x4EBA;&#x7528;&#x9017;&#x53F7;&#x6216;&#x987F;&#x53F7;&#x5206;&#x9694;"></div>
+              <div class="form-group full-width" id="attendeeTagsRow" style="display:none;">
+                <label style="color:#888;font-size:0.8rem;">拖拽姓名到说话人映射框</label>
+                <div id="attendeeTags" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;"></div>
+              </div>
+              <div class="form-group full-width"><label for="distributeList">&#x4E3B;&#x9001;&#x8303;&#x56F4;</label><input type="text" id="distributeList" placeholder="&#x7559;&#x7A7A;&#x5219;&#x9ED8;&#x8BA4;&#x4E3A;&#x53C2;&#x52A0;&#x4EBA;&#x5458;"></div>
+              <div class="form-group full-width"><label for="ccList">&#x6284;&#x9001;&#x8303;&#x56F4;</label><input type="text" id="ccList" placeholder="&#x8BF7;&#x8F93;&#x5165;&#x6284;&#x9001;&#x8303;&#x56F4;"></div>
+            </div>
+            <div class="speaker-assign-title">&#x8BF4;&#x8BDD;&#x4EBA;&#x6620;&#x5C04;</div>
+            <div style="display:grid;grid-template-columns:80px 1fr;gap:6px;margin-bottom:6px;">
+              <span style="font-size:0.78rem;color:#999;">&#x8BF4;&#x8BDD;&#x4EBA;</span>
+              <span style="font-size:0.78rem;color:#999;">&#x771F;&#x5B9E;&#x59D3;&#x540D;</span>
+            </div>
+            <div id="speakerRows"></div>
+            <div class="speaker-map-box">
+              <label>&#x8BF4;&#x8BDD;&#x4EBA;&#x6620;&#x5C04;&#xFF08;&#x81EA;&#x52A8;&#x751F;&#x6210;&#xFF0C;&#x53EF;&#x624B;&#x52A8;&#x4FEE;&#x6539;&#xFF09;</label>
+              <input type="text" id="speakerMapInput" placeholder="&#x5982;&#xFF1A;&#x8BF4;&#x8BDD;&#x4EBA;1=&#x5F20;&#x4E09;&#xFF0C;&#x8BF4;&#x8BDD;&#x4EBA;2=&#x674E;&#x56DB;">
+            </div>
+            <div class="btn-row" style="margin-top:18px;">
+              <button class="btn-secondary" id="backToStep1Btn">&#x2190; &#x8FD4;&#x56DE;</button>
+              <button class="btn" id="analyzeBtn">&#x1F50D; &#x5F00;&#x59CB;&#x5206;&#x6790;</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="loading" id="loadingStep2" style="display:none;">
+        <div class="loading-spinner"></div>
+        <p>&#x6B63;&#x5728;&#x5206;&#x6790;&#x4F1A;&#x8BAE;&#x5185;&#x5BB9;&#xFF0C;&#x8BF7;&#x7A0D;&#x5019;...</p>
+      </div>
+    </div>
+    <div id="step3" style="display:none;">
+      <div class="card">
+        <div class="card-title">&#x2705; &#x786E;&#x8BA4;&#x4F1A;&#x8BAE;&#x5185;&#x5BB9;&#xFF08;&#x53EF;&#x7F16;&#x8F91;&#x540E;&#x786E;&#x8BA4;&#xFF09;</div>
+        <div class="confirm-section">
+          <div class="confirm-section-title">&#x1F3AF; &#x4F1A;&#x8BAE;&#x76EE;&#x7684;</div>
+          <textarea class="editable-textarea" id="confirmPurpose" rows="3" oninput="autoResize(this)"></textarea>
+        </div>
+        <hr class="divider">
+        <div class="confirm-section">
+          <div class="confirm-section-title">&#x2753; &#x4F1A;&#x8BAE;&#x8981;&#x89E3;&#x51B3;&#x7684;&#x95EE;&#x9898;</div>
+          <div id="confirmProblems"></div>
+        </div>
+        <hr class="divider">
+        <div class="confirm-section">
+          <div class="confirm-section-title">&#x1F4CC; &#x4F1A;&#x8BAE;&#x8BA1;&#x5212;</div>
+          <div id="confirmPlans"></div>
+        </div>
+        <hr class="divider">
+        <div class="confirm-section" id="confirmSpeakerSection" style="display:none;">
+          <div class="confirm-section-title">&#x1F64B; &#x5404;&#x65B9;&#x89C2;&#x70B9;</div>
+          <div id="confirmSpeakerViews"></div>
+          <hr class="divider">
+        </div>
+        <div class="confirm-section">
+          <div class="confirm-section-title">&#x1F4DD; &#x4F1A;&#x8BAE;&#x8BB0;&#x5F55;</div>
+          <div id="confirmRecordBlocks"></div>
+        </div>
+        <hr class="divider">
+        <div class="confirm-section">
+          <div class="confirm-section-title">&#x1F680; &#x540E;&#x7EED;&#x884C;&#x52A8;&#x9879;</div>
+          <table class="action-table">
+            <thead><tr>
+              <th style="width:40px;">&#x5E8F;&#x53F7;</th>
+              <th>&#x4EFB;&#x52A1;&#x5185;&#x5BB9;</th>
+              <th style="width:120px;">&#x8D1F;&#x8D23;&#x4EBA;</th>
+              <th style="width:130px;">&#x622A;&#x6B62;&#x65F6;&#x95F4;</th>
+            </tr></thead>
+            <tbody id="actionTableBody"></tbody>
+          </table>
+        </div>
+        <div class="btn-row" style="margin-top:24px;">
+          <button class="btn-secondary" id="backToStep2Btn">&#x2190; &#x8FD4;&#x56DE;&#x4FEE;&#x6539;</button>
+          <button class="btn" id="generateBtn">&#x2705; &#x786E;&#x8BA4;&#xFF0C;&#x751F;&#x6210;&#x6587;&#x6863;</button>
+        </div>
+      </div>
+      <div class="loading" id="loadingStep3" style="display:none;">
+        <div class="loading-spinner"></div>
+        <p>&#x6B63;&#x5728;&#x751F;&#x6210;&#x4F1A;&#x8BAE;&#x7EAA;&#x8981;&#x6587;&#x6863;&#xFF0C;&#x8BF7;&#x7A0D;&#x5019;...</p>
+      </div>
+    </div>
+
+    <div id="step4" style="display:none;">
+      <div class="card">
+        <div class="success-box">
+          <div class="success-icon">&#x1F389;</div>
+          <h2>&#x4F1A;&#x8BAE;&#x7EAA;&#x8981;&#x5DF2;&#x751F;&#x6210;&#xFF01;</h2>
+          <p>&#x6587;&#x6863;&#x5DF2;&#x51C6;&#x5907;&#x5C31;&#x7EEA;&#xFF0C;&#x70B9;&#x51FB;&#x4E0B;&#x65B9;&#x6309;&#x94AE;&#x4E0B;&#x8F7D;</p>
+          <button class="btn btn-green" id="downloadBtn">&#x1F4E5; &#x4E0B;&#x8F7D;&#x4F1A;&#x8BAE;&#x7EAA;&#x8981;&#xFF08;.docx&#xFF09;</button>
+          <br>
+          <button class="btn-secondary" id="restartBtn" style="margin-top:12px;">&#x91CD;&#x65B0;&#x5F00;&#x59CB;</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <script>
+    var currentTranscript = '';
+    var analyzeResult = null;
+    var currentDocPath = null;
+    var selectedFile = null;
+
+    function formatSize(b) {
+      if (b < 1024) return b + ' B';
+      if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+      return (b/1048576).toFixed(1) + ' MB';
+    }
+
+    function todayStr() {
+      return new Date().toISOString().slice(0,10);
+    }
+
+    function extractSpeakers(text) {
+      var nums = [];
+      var re = /\u8bf4\u8bdd\u4eba(\d+)[:\uff1a]/g;
+      var m;
+      while ((m = re.exec(text)) !== null) {
+        var n = parseInt(m[1], 10);
+        if (nums.indexOf(n) === -1) nums.push(n);
+      }
+      return nums.sort(function(a,b){return a-b;});
+    }
+
+    function showStep(n) {
+      for (var i=1; i<=4; i++) {
+        var el = document.getElementById('step'+i);
+        if (el) el.style.display = (i===n) ? '' : 'none';
+        var item = document.getElementById('stepItem'+i);
+        if (item) {
+          item.classList.remove('active','done');
+          if (i===n) item.classList.add('active');
+          if (i<n)  item.classList.add('done');
+        }
+        if (i<4) {
+          var conn = document.getElementById('conn'+i);
+          if (conn) conn.classList.toggle('done', i<n);
+        }
+      }
+    }
+
+    function autoResize(el) {
+      el.style.height = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+    }
+
+    function escH(s) {
+      return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // Step 1
+    var uploadArea = document.getElementById('uploadArea');
+    var audioFileEl = document.getElementById('audioFile');
+
+    uploadArea.addEventListener('click', function(){ audioFileEl.click(); });
+    uploadArea.addEventListener('dragover', function(e){ e.preventDefault(); uploadArea.classList.add('dragover'); });
+    uploadArea.addEventListener('dragleave', function(){ uploadArea.classList.remove('dragover'); });
+    uploadArea.addEventListener('drop', function(e){
+      e.preventDefault(); uploadArea.classList.remove('dragover');
+      if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]);
+    });
+    audioFileEl.addEventListener('change', function(e){ if (e.target.files.length) setFile(e.target.files[0]); });
+
+    function setFile(f) {
+      selectedFile = f;
+      document.getElementById('fileName').textContent = '\u5df2\u9009\u62e9\uff1a' + f.name + '\uff08' + formatSize(f.size) + '\uff09';
+      document.getElementById('fileInfo').classList.add('show');
+    }
+
+    document.getElementById('transcribeBtn').addEventListener('click', async function() {
+      if (!selectedFile) { alert('\u8bf7\u5148\u9009\u62e9\u5f55\u97f3\u6587\u4ef6'); return; }
+      var btn = document.getElementById('transcribeBtn');
+      btn.disabled = true;
+      document.getElementById('loadingStep1').style.display = '';
+      document.getElementById('transcriptResult').style.display = 'none';
+      try {
+        var fd = new FormData();
+        fd.append('audio', selectedFile);
+        var res = await fetch('http://localhost:3000/api/meeting/transcribe', {method:'POST', body:fd});
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var data = await res.json();
+        if (!data.success) throw new Error(data.error || '\u8f6c\u5199\u5931\u8d25');
+        currentTranscript = data.transcribeText || data.text || data.transcript || '';
+        document.getElementById('transcriptBox').value = currentTranscript;
+        document.getElementById('transcriptResult').style.display = '';
+      } catch(e) {
+        alert('\u8f6c\u5199\u5931\u8d25\uff1a' + e.message);
+      } finally {
+        document.getElementById('loadingStep1').style.display = 'none';
+        btn.disabled = false;
+      }
+    });
+
+    document.getElementById('useManualBtn').addEventListener('click', function() {
+      var t = document.getElementById('manualText').value.trim();
+      if (!t) { alert('\u8bf7\u5148\u8f93\u5165\u8f6c\u5199\u6587\u672c'); return; }
+      currentTranscript = t;
+      goToStep2();
+    });
+
+    document.getElementById('toStep2Btn').addEventListener('click', goToStep2);
+
+    function goToStep2() {
+      if (!currentTranscript) { alert('\u6ca1\u6709\u53ef\u7528\u7684\u8f6c\u5199\u6587\u672c'); return; }
+      document.getElementById('transcriptRef').value = currentTranscript;
+      document.getElementById('meetingDate').value = todayStr();
+      buildSpeakerRows(extractSpeakers(currentTranscript));
+      showStep(2);
+    }
+    // Step 2 - speaker rows
+    function buildSpeakerRows(nums) {
+      var container = document.getElementById('speakerRows');
+      container.innerHTML = '';
+      if (!nums.length) {
+        container.innerHTML = '<p style="color:#999;font-size:0.85rem;">\u8f6c\u5199\u6587\u672c\u4e2d\u672a\u68c0\u6d4b\u5230\u201c\u8bf4\u8bdd\u4eban\u201d\u683c\u5f0f\uff0c\u53ef\u624b\u52a8\u5728\u4e0b\u65b9\u6620\u5c04\u6846\u586b\u5199\u3002</p>';
+        document.getElementById('speakerMapInput').removeAttribute('readonly');
+        return;
+      }
+      nums.forEach(function(n) {
+        var row = document.createElement('div');
+        row.className = 'speaker-row';
+        row.dataset.speaker = n;
+        row.innerHTML = '<div class="speaker-label">\u8bf4\u8bdd\u4eba' + n + '</div>' +
+          '<input type="text" placeholder="\u62d6\u5165\u59d3\u540d\u6216\u624b\u52a8\u8f93\u5165" class="sp-name" data-n="' + n + '">';
+        container.appendChild(row);
+      });
+      container.querySelectorAll('.sp-name').forEach(function(inp) {
+        inp.addEventListener('input', updateSpeakerMap);
+        // 支持拖拽放入
+        inp.addEventListener('dragover', function(e) { e.preventDefault(); inp.style.borderColor = '#4f8ef7'; });
+        inp.addEventListener('dragleave', function() { inp.style.borderColor = ''; });
+        inp.addEventListener('drop', function(e) {
+          e.preventDefault();
+          inp.style.borderColor = '';
+          var name = e.dataTransfer.getData('text/plain');
+          if (name) { inp.value = name; updateSpeakerMap(); }
+        });
+      });
+      updateSpeakerMap();
+    }
+
+    function updateSpeakerMap() {
+      var rows = document.querySelectorAll('#speakerRows .speaker-row');
+      var parts = [];
+      rows.forEach(function(row) {
+        var n = row.dataset.speaker;
+        var name = row.querySelector('.sp-name').value.trim();
+        if (name) parts.push('\u8bf4\u8bdd\u4eba' + n + '=' + name);
+      });
+      document.getElementById('speakerMapInput').value = parts.join('\uff0c');
+    }
+
+    function getSpeakerMap() {
+      return document.getElementById('speakerMapInput').value.trim();
+    }
+
+    function getActionItemsFromRows() {
+      return [];
+    }
+
+    function getBasicInfo() {
+      return {
+        meetingName:   document.getElementById('meetingName').value.trim(),
+        convener:      document.getElementById('convener').value.trim(),
+        date:          document.getElementById('meetingDate').value,
+        startTime:     document.getElementById('startTime').value,
+        duration:      document.getElementById('duration').value.trim(),
+        location:      document.getElementById('location').value.trim(),
+        recorder:      document.getElementById('recorder').value.trim(),
+        reviewer:      document.getElementById('reviewer').value.trim(),
+        attendees:     document.getElementById('attendees').value.trim(),
+        distributeList: document.getElementById('distributeList').value.trim(),
+        ccList:        document.getElementById('ccList').value.trim()
+      };
+    }
+
+    document.getElementById('backToStep1Btn').addEventListener('click', function(){ showStep(1); });
+
+    // 参加人员输入时实时生成可拖拽标签
+    document.getElementById('attendees').addEventListener('input', function() {
+      var raw = this.value.trim();
+      var names = raw ? raw.split(/[,，;；\s]+/).map(function(s){ return s.trim(); }).filter(Boolean) : [];
+      var tagsContainer = document.getElementById('attendeeTags');
+      var tagsRow = document.getElementById('attendeeTagsRow');
+      tagsContainer.innerHTML = '';
+      if (names.length) {
+        tagsRow.style.display = '';
+        names.forEach(function(name) {
+          var tag = document.createElement('span');
+          tag.className = 'attendee-tag';
+          tag.textContent = name;
+          tag.draggable = true;
+          tag.addEventListener('dragstart', function(e) {
+            e.dataTransfer.setData('text/plain', name);
+          });
+          tagsContainer.appendChild(tag);
+        });
+      } else {
+        tagsRow.style.display = 'none';
+      }
+    });
+
+    document.getElementById('analyzeBtn').addEventListener('click', async function() {
+      var btn = document.getElementById('analyzeBtn');
+      btn.disabled = true;
+      document.getElementById('loadingStep2').style.display = '';
+      try {
+        var res = await fetch('http://localhost:3000/api/meeting/analyze', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({text: currentTranscript, speakerMap: getSpeakerMap()})
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var data = await res.json();
+        if (!data.success) throw new Error(data.error || '\u5206\u6790\u5931\u8d25');
+        analyzeResult = data;
+        if (data.actionItems && Array.isArray(data.actionItems)) {
+          analyzeResult.actionItems = data.actionItems;
+        }
+        buildStep3(data);
+        showStep(3);
+      } catch(e) {
+        alert('\u5206\u6790\u5931\u8d25\uff1a' + e.message);
+      } finally {
+        document.getElementById('loadingStep2').style.display = 'none';
+        btn.disabled = false;
+      }
+    });
+    // Step 3 - build confirm UI
+    function buildEditableList(cid, items) {
+      var el = document.getElementById(cid);
+      el.innerHTML = '';
+      var arr = items.length ? items : [''];
+      arr.forEach(function(item) {
+        var div = document.createElement('div');
+        div.className = 'list-edit-item';
+        div.innerHTML = '<input type="text" value="' + escH(item) + '"><button class="btn-remove-item" onclick="this.parentElement.remove()">&#x2715;</button>';
+        el.appendChild(div);
+      });
+    }
+
+    function buildStep3(data) {
+      var mc = data.meetingContent || {};
+      var mr = data.meetingRecords || {};
+      var sv = data.speakerViews || {};
+
+      // 从步骤2的说话人映射框解析真实姓名：{1: "张三", 2: "李四"}
+      var nameMap = {};
+      document.querySelectorAll('#speakerRows .speaker-row').forEach(function(row) {
+        var n = row.dataset.speaker;
+        var name = row.querySelector('.sp-name').value.trim();
+        if (name) nameMap[n] = name;
+      });
+      function resolveSpName(spName, idx) {
+        // spName 可能是 "说话人1" 或 "说话人1（若有映射...）" 或已经是真名
+        var m = (spName || '').match(/说话人(\d+)/);
+        if (m && nameMap[m[1]]) return nameMap[m[1]];
+        // 如果不含"说话人"字样，且是模板文字则用映射
+        if (nameMap[String(idx + 1)]) return nameMap[String(idx + 1)];
+        return spName || ('说话人' + (idx + 1));
+      }
+
+      // 替换文本中的说话人编号为真实姓名
+      function replaceSpeakerNames(str) {
+        return (str || '').replace(/说话人(\d+)/g, function(_, n) {
+          return nameMap[n] || ('说话人' + n);
+        });
+      }
+
+      document.getElementById('confirmPurpose').value = replaceSpeakerNames(mc.purpose || '');
+      setTimeout(function(){ autoResize(document.getElementById('confirmPurpose')); }, 0);
+      buildEditableList('confirmProblems', mc.problems || []);
+      buildEditableList('confirmPlans', mc.plans || []);
+
+      var speakers = (sv.speakers || []);
+      // 如果大模型没返回说话人观点，但用户填了说话人映射，手动构建
+      if (speakers.length === 0 && Object.keys(nameMap).length > 0) {
+        speakers = Object.keys(nameMap).sort().map(function(n) {
+          return { name: nameMap[n], points: [] };
+        });
+      }
+      var spSection = document.getElementById('confirmSpeakerSection');
+      if (speakers.length > 0) {
+        var container = document.getElementById('confirmSpeakerViews');
+        container.innerHTML = '';
+        speakers.forEach(function(sp, si) {
+          var div = document.createElement('div');
+          div.className = 'speaker-view-edit';
+          div.dataset.si = si;
+          var badge = '<span class="speaker-name-badge">' + escH(resolveSpName(sp.name, si)) + '</span>';
+          var pts = (sp.points||[]).map(function(p,pi){
+            return '<div class="list-edit-item"><textarea class="point-textarea" oninput="autoResize(this)">'+escH(p)+'</textarea><button class="btn-remove-item" onclick="this.parentElement.remove()">&#x2715;</button></div>';
+          }).join('');
+          div.innerHTML = badge + '<div class="sp-points-list">' + pts + '</div>';
+          container.appendChild(div);
+        });
+        // 渲染完后对所有观点 textarea 触发自适应高度
+        setTimeout(function(){
+          container.querySelectorAll('.point-textarea').forEach(autoResize);
+        }, 0);
+        spSection.style.display = '';
+      } else {
+        spSection.style.display = 'none';
+      }
+
+      var blocks = mr.blocks || [];
+      var blocksEl = document.getElementById('confirmRecordBlocks');
+      blocksEl.innerHTML = '';
+      if (blocks.length === 0) {
+        blocksEl.innerHTML = '<p style="color:#999;font-size:0.88rem;">\u6682\u65e0\u4f1a\u8bae\u8bb0\u5f55\u5206\u5757</p>';
+      } else {
+        blocks.forEach(function(b) {
+          var div = document.createElement('div');
+          div.className = 'record-block-edit';
+          div.innerHTML = '<input type="text" value="'+escH(replaceSpeakerNames(b.title||''))+'" placeholder="\u6807\u9898"><textarea rows="4">'+escH(replaceSpeakerNames(b.content||''))+'</textarea>';
+          blocksEl.appendChild(div);
+        });
+      }
+
+      var tbody = document.getElementById('actionTableBody');
+      tbody.innerHTML = '';
+      var actions = (data.actionItems && data.actionItems.length > 0)
+        ? data.actionItems
+        : getActionItemsFromRows();
+      if (actions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999;padding:12px;">\u672a\u63d0\u53d6\u5230\u884c\u52a8\u9879\uff0c\u53ef\u5728\u6b64\u624b\u52a8\u6dfb\u52a0</td></tr>';
+      } else {
+        actions.forEach(function(a, i) {
+          var tr = document.createElement('tr');
+          tr.innerHTML = '<td class="seq-num">'+(i+1)+'</td><td><input type="text" value="'+escH(replaceSpeakerNames(a.content||''))+'"></td><td><input type="text" value="'+escH(replaceSpeakerNames(a.owner||''))+'"></td><td><input type="text" value="'+escH(a.deadline||'')+'"></td>';
+          tbody.appendChild(tr);
+        });
+      }
+    }
+
+    function collectStep3Data() {
+      var mc = analyzeResult ? Object.assign({}, analyzeResult.meetingContent) : {};
+      var mr = analyzeResult ? Object.assign({}, analyzeResult.meetingRecords) : {};
+      var sv = analyzeResult ? Object.assign({}, analyzeResult.speakerViews) : {};
+
+      mc.purpose = document.getElementById('confirmPurpose').value;
+      mc.problems = Array.from(document.querySelectorAll('#confirmProblems .list-edit-item input')).map(function(i){return i.value;}).filter(Boolean);
+      mc.plans = Array.from(document.querySelectorAll('#confirmPlans .list-edit-item input')).map(function(i){return i.value;}).filter(Boolean);
+
+      var spDivs = document.querySelectorAll('#confirmSpeakerViews .speaker-view-edit');
+      if (spDivs.length > 0) {
+        var origSpeakers = (analyzeResult && analyzeResult.speakerViews && analyzeResult.speakerViews.speakers) || [];
+        sv.speakers = Array.from(spDivs).map(function(div, si) {
+          var origSp = origSpeakers[si] || {};
+          var points = Array.from(div.querySelectorAll('.sp-points-list .point-textarea')).map(function(i){return i.value;}).filter(Boolean);
+          return {name: origSp.name || ('\u8bf4\u8bdd\u4eba'+(si+1)), points: points};
+        });
+      }
+
+      var blockDivs = document.querySelectorAll('#confirmRecordBlocks .record-block-edit');
+      mr.blocks = Array.from(blockDivs).map(function(div){
+        return {title: div.querySelector('input').value, content: div.querySelector('textarea').value};
+      });
+
+      var actionRows = document.querySelectorAll('#actionTableBody tr');
+      var actionItems = [];
+      actionRows.forEach(function(tr) {
+        var inputs = tr.querySelectorAll('input');
+        if (inputs.length >= 3) {
+          var content = inputs[0].value.trim();
+          var owner = inputs[1].value.trim();
+          var deadline = inputs[2].value.trim();
+          if (content || owner) actionItems.push({content: content, owner: owner, deadline: deadline});
+        }
+      });
+      return {meetingContent: mc, meetingRecords: mr, speakerViews: sv, actionItems: actionItems};
+    }
+
+    document.getElementById('backToStep2Btn').addEventListener('click', function(){ showStep(2); });
+
+    document.getElementById('generateBtn').addEventListener('click', async function() {
+      var btn = document.getElementById('generateBtn');
+      btn.disabled = true;
+      document.getElementById('loadingStep3').style.display = '';
+      try {
+        var d = collectStep3Data();
+        var res = await fetch('http://localhost:3000/api/meeting/generate', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({meetingContent: d.meetingContent, meetingRecords: d.meetingRecords, speakerViews: d.speakerViews, actionItems: d.actionItems, basicInfo: getBasicInfo()})
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var data = await res.json();
+        if (!data.success) throw new Error(data.error || '\u751f\u6210\u5931\u8d25');
+        currentDocPath = data.documentPath || data.filePath || null;
+        showStep(4);
+      } catch(e) {
+        alert('\u751f\u6210\u5931\u8d25\uff1a' + e.message);
+      } finally {
+        document.getElementById('loadingStep3').style.display = 'none';
+        btn.disabled = false;
+      }
+    });
+
+    document.getElementById('downloadBtn').addEventListener('click', function() {
+      if (!currentDocPath) { alert('\u6587\u4ef6\u8def\u5f84\u65e0\u6548\uff0c\u8bf7\u91cd\u8bd5'); return; }
+      window.open('http://localhost:3000/api/meeting/download?filePath=' + encodeURIComponent(currentDocPath));
+    });
+
+    document.getElementById('restartBtn').addEventListener('click', function() {
+      currentTranscript = ''; analyzeResult = null; currentDocPath = null; selectedFile = null;
+      document.getElementById('audioFile').value = '';
+      document.getElementById('fileInfo').classList.remove('show');
+      document.getElementById('manualText').value = '';
+      document.getElementById('transcriptResult').style.display = 'none';
+      showStep(1);
+    });
+
+    // Init
+    showStep(1);
+  </script>
+</body>
+</html>
