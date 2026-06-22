@@ -571,7 +571,7 @@
       try {
         var fd = new FormData();
         fd.append('audio', selectedFile);
-        var res = await fetch('http://localhost:3000/api/meeting/transcribe', {method:'POST', body:fd});
+        var res = await fetch('/api/meeting/transcribe', {method:'POST', body:fd});
         if (!res.ok) throw new Error('HTTP ' + res.status);
         var data = await res.json();
         if (!data.success) throw new Error(data.error || '\u8f6c\u5199\u5931\u8d25');
@@ -700,7 +700,7 @@
       btn.disabled = true;
       document.getElementById('loadingStep2').style.display = '';
       try {
-        var res = await fetch('http://localhost:3000/api/meeting/analyze', {
+        var res = await fetch('/api/meeting/analyze', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({text: currentTranscript, speakerMap: getSpeakerMap()})
@@ -874,7 +874,7 @@
       document.getElementById('loadingStep3').style.display = '';
       try {
         var d = collectStep3Data();
-        var res = await fetch('http://localhost:3000/api/meeting/generate', {
+        var res = await fetch('/api/meeting/generate', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({meetingContent: d.meetingContent, meetingRecords: d.meetingRecords, speakerViews: d.speakerViews, actionItems: d.actionItems, basicInfo: getBasicInfo()})
@@ -894,7 +894,7 @@
 
     document.getElementById('downloadBtn').addEventListener('click', function() {
       if (!currentDocPath) { alert('\u6587\u4ef6\u8def\u5f84\u65e0\u6548\uff0c\u8bf7\u91cd\u8bd5'); return; }
-      window.open('http://localhost:3000/api/meeting/download?filePath=' + encodeURIComponent(currentDocPath));
+      window.open('/api/meeting/download?filePath=' + encodeURIComponent(currentDocPath));
     });
 
     document.getElementById('restartBtn').addEventListener('click', function() {
